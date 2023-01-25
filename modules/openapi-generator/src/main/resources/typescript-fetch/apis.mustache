@@ -263,6 +263,7 @@ export class {{classname}} extends runtime.BaseAPI {
             method: '{{httpMethod}}',
             headers: headerParameters,
             query: queryParameters,
+            operationId: "{{nickname}}",
             {{#hasBodyParam}}
             {{#bodyParam}}
             {{#isContainer}}

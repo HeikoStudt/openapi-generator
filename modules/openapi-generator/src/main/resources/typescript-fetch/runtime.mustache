@@ -104,7 +104,7 @@ export class BaseAPI {
 
     protected async request(context: RequestOpts, initOverrides?: RequestInit | InitOverrideFunction): Promise<Response> {
         const { url, init } = await this.createFetchParams(context, initOverrides);
-        const response = await this.fetchApi(url, init);
+        const response = await this.fetchApi(url, init, context.operationId);
         if (response && (response.status >= 200 && response.status < 300)) {
             return response;
         }
@@ -156,12 +156,13 @@ export class BaseAPI {
         return { url, init };
     }
 
-    private fetchApi = async (url: string, init: RequestInit) => {
+    private fetchApi = async (url: string, init: RequestInit, operationId?: string) => {
         let fetchParams = { url, init };
         for (const middleware of this.middleware) {
             if (middleware.pre) {
                 fetchParams = await middleware.pre({
-                    fetch: this.fetchApi,
+                    fetch: (url: string, init: RequestInit) => this.fetchApi(url, init, operationId),
+                    operationId,
                     ...fetchParams,
                 }) || fetchParams;
             }
@@ -173,11 +174,12 @@ export class BaseAPI {
             for (const middleware of this.middleware) {
                 if (middleware.onError) {
                     response = await middleware.onError({
-                        fetch: this.fetchApi,
+                        fetch: (url: string, init: RequestInit) => this.fetchApi(url, init, operationId),
                         url: fetchParams.url,
                         init: fetchParams.init,
                         error: e,
                         response: response ? response.clone() : undefined,
+                        operationId,
                     }) || response;
                 }
             }
@@ -192,10 +194,11 @@ export class BaseAPI {
         for (const middleware of this.middleware) {
             if (middleware.post) {
                 response = await middleware.post({
-                    fetch: this.fetchApi,
+                    fetch: (url: string, init: RequestInit) => this.fetchApi(url, init, operationId),
                     url: fetchParams.url,
                     init: fetchParams.init,
                     response: response.clone(),
+                    operationId,
                 }) || response;
             }
         }
@@ -273,6 +276,7 @@ export interface RequestOpts {
     headers: HTTPHeaders;
     query?: HTTPQuery;
     body?: HTTPBody;
+    operationId?: string;
 }
 
 {{^withoutRuntimeChecks}}
@@ -335,6 +339,7 @@ export interface RequestContext {
     fetch: FetchAPI;
     url: string;
     init: RequestInit;
+    operationId?: string;
 }
 
 export interface ResponseContext {
@@ -342,6 +347,7 @@ export interface ResponseContext {
     url: string;
     init: RequestInit;
     response: Response;
+    operationId?: string;
 }
 
 export interface ErrorContext {
@@ -350,6 +356,7 @@ export interface ErrorContext {
     init: RequestInit;
     error: unknown;
     response?: Response;
+    operationId?: string;
 }
 
 export interface Middleware {
